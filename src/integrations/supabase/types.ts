@@ -14,7 +14,401 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cards: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          profile_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          profile_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collection_history: {
+        Row: {
+          created_at: string | null
+          debtor_id: string
+          id: string
+          is_received: boolean | null
+          month: number
+          reminder_method: string | null
+          reminder_sent_at: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          debtor_id: string
+          id?: string
+          is_received?: boolean | null
+          month: number
+          reminder_method?: string | null
+          reminder_sent_at?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          debtor_id?: string
+          id?: string
+          is_received?: boolean | null
+          month?: number
+          reminder_method?: string | null
+          reminder_sent_at?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_history_debtor_id_fkey"
+            columns: ["debtor_id"]
+            isOneToOne: false
+            referencedRelation: "debtors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debtors: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          due_day: number | null
+          email: string | null
+          id: string
+          is_recurring: boolean | null
+          monthly_value: number | null
+          name: string
+          pix_key: string | null
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          due_day?: number | null
+          email?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          monthly_value?: number | null
+          name: string
+          pix_key?: string | null
+          profile_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          due_day?: number | null
+          email?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          monthly_value?: number | null
+          name?: string
+          pix_key?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debtors_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          card_id: string | null
+          category: string | null
+          created_at: string | null
+          due_day: number | null
+          id: string
+          is_paid: boolean | null
+          is_recurring: boolean | null
+          month: number
+          name: string
+          notes: string | null
+          parcel_current: number | null
+          parcel_total: number | null
+          payment_method: string | null
+          profile_id: string
+          sort_order: number | null
+          value: number
+          year: number
+        }
+        Insert: {
+          card_id?: string | null
+          category?: string | null
+          created_at?: string | null
+          due_day?: number | null
+          id?: string
+          is_paid?: boolean | null
+          is_recurring?: boolean | null
+          month: number
+          name: string
+          notes?: string | null
+          parcel_current?: number | null
+          parcel_total?: number | null
+          payment_method?: string | null
+          profile_id: string
+          sort_order?: number | null
+          value: number
+          year: number
+        }
+        Update: {
+          card_id?: string | null
+          category?: string | null
+          created_at?: string | null
+          due_day?: number | null
+          id?: string
+          is_paid?: boolean | null
+          is_recurring?: boolean | null
+          month?: number
+          name?: string
+          notes?: string | null
+          parcel_current?: number | null
+          parcel_total?: number | null
+          payment_method?: string | null
+          profile_id?: string
+          sort_order?: number | null
+          value?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pix_keys: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          key_value: string
+          label: string | null
+          profile_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          key_value: string
+          label?: string | null
+          profile_id: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          key_value?: string
+          label?: string | null
+          profile_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pix_keys_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pj_entries: {
+        Row: {
+          category: string | null
+          client: string | null
+          created_at: string | null
+          description: string
+          entry_date: string | null
+          id: string
+          month: number
+          payment_method: string | null
+          profile_id: string
+          type: string
+          value: number
+          year: number
+        }
+        Insert: {
+          category?: string | null
+          client?: string | null
+          created_at?: string | null
+          description: string
+          entry_date?: string | null
+          id?: string
+          month: number
+          payment_method?: string | null
+          profile_id: string
+          type: string
+          value: number
+          year: number
+        }
+        Update: {
+          category?: string | null
+          client?: string | null
+          created_at?: string | null
+          description?: string
+          entry_date?: string | null
+          id?: string
+          month?: number
+          payment_method?: string | null
+          profile_id?: string
+          type?: string
+          value?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pj_entries_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pj_goals: {
+        Row: {
+          created_at: string | null
+          id: string
+          month: number
+          profile_id: string
+          revenue_goal: number | null
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          month: number
+          profile_id: string
+          revenue_goal?: number | null
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          month?: number
+          profile_id?: string
+          revenue_goal?: number | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pj_goals_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          color: string
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      receivables: {
+        Row: {
+          created_at: string | null
+          due_day: number | null
+          id: string
+          is_received: boolean | null
+          month: number
+          parcel_current: number | null
+          parcel_total: number | null
+          person_name: string
+          pix_key: string | null
+          profile_id: string
+          value: number | null
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          due_day?: number | null
+          id?: string
+          is_received?: boolean | null
+          month: number
+          parcel_current?: number | null
+          parcel_total?: number | null
+          person_name: string
+          pix_key?: string | null
+          profile_id: string
+          value?: number | null
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          due_day?: number | null
+          id?: string
+          is_received?: boolean | null
+          month?: number
+          parcel_current?: number | null
+          parcel_total?: number | null
+          person_name?: string
+          pix_key?: string | null
+          profile_id?: string
+          value?: number | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receivables_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
