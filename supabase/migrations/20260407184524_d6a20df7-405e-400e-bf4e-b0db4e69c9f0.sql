@@ -1,0 +1,1 @@
+ALTER TABLE public.cards ADD COLUMN credit_limit numeric NULL;
