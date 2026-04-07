@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, PJ_INCOME_CATEGORIES, PJ_EXPENSE_CATEGORIES, PAYMENT_METHODS } from '@/lib/constants';
-import { TrendingUp, TrendingDown, DollarSign, Percent, Plus, Trash2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { TrendingUp, TrendingDown, DollarSign, Percent, Plus, Trash2, PackageOpen } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import BottomSheet from '@/components/BottomSheet';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ export default function PjTab() {
   const [formType, setFormType] = useState<'income' | 'expense'>('income');
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalValue, setGoalValue] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Form state
   const [desc, setDesc] = useState('');
@@ -52,8 +53,7 @@ export default function PjTab() {
     ]);
     if (entriesRes.data) setEntries(entriesRes.data);
     if (goalRes.data) { setGoal(goalRes.data); setGoalValue(goalRes.data.revenue_goal?.toString() || ''); }
-    
-    // Build chart data for last 6 months
+
     if (chartRes.data) {
       const months: Record<string, { income: number; expense: number; month: string }> = {};
       const MNAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -87,10 +87,12 @@ export default function PjTab() {
     return acc;
   }, {} as Record<string, number>);
   const pieData = Object.entries(expenseByCategory).map(([name, value]) => ({ name, value }));
+  const totalExpensePJ = pieData.reduce((s, d) => s + d.value, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!desc || !value || !activeProfile) return;
+    setSaving(true);
     await supabase.from('pj_entries').insert({
       profile_id: activeProfile.id, description: desc, value: parseFloat(value),
       entry_date: entryDate || null, type: formType, category: category || null,
@@ -98,6 +100,7 @@ export default function PjTab() {
       month: currentMonth, year: currentYear,
     });
     toast.success('Lançamento adicionado');
+    setSaving(false);
     setShowForm(false);
     setDesc(''); setValue(''); setEntryDate(''); setCategory(''); setClient(''); setPaymentMethod('pix');
     loadData();
@@ -171,7 +174,7 @@ export default function PjTab() {
         )}
       </div>
 
-      {/* Charts */}
+      {/* Bar Chart */}
       {chartData.length > 0 && (
         <div className="p-3 rounded-xl bg-card border border-border">
           <h3 className="text-sm font-semibold text-foreground mb-3">Faturamento vs Gastos</h3>
@@ -187,19 +190,37 @@ export default function PjTab() {
         </div>
       )}
 
-      {pieData.length > 0 && (
-        <div className="p-3 rounded-xl bg-card border border-border">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Gastos por categoria</h3>
-          <ResponsiveContainer width="100%" height={200}>
+      {/* Pie Chart */}
+      <div className="p-3 rounded-xl bg-card border border-border">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Distribuição de gastos PJ</h3>
+        {pieData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={250}>
             <PieChart>
-              <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+              <Pie data={pieData} cx="50%" cy="45%" innerRadius={45} outerRadius={75} dataKey="value" paddingAngle={2}>
                 {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(222, 47%, 9%)', border: '1px solid hsl(222, 30%, 18%)', borderRadius: 8, color: 'hsl(210, 40%, 96%)' }} />
+              <Tooltip
+                contentStyle={{ backgroundColor: 'hsl(222, 47%, 9%)', border: '1px solid hsl(222, 30%, 18%)', borderRadius: 8, color: 'hsl(210, 40%, 96%)' }}
+                formatter={(val: number) => formatCurrency(val)}
+              />
+              <Legend
+                verticalAlign="bottom"
+                formatter={(value: string) => {
+                  const item = pieData.find(d => d.name === value);
+                  const pct = item && totalExpensePJ > 0 ? ((item.value / totalExpensePJ) * 100).toFixed(0) : '0';
+                  return `${value} (${pct}%)`;
+                }}
+                wrapperStyle={{ fontSize: 11, color: 'hsl(215, 20%, 55%)' }}
+              />
             </PieChart>
           </ResponsiveContainer>
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground">
+            <PackageOpen className="w-8 h-8" />
+            <p className="text-sm">Nenhuma despesa cadastrada ainda</p>
+          </div>
+        )}
+      </div>
 
       {/* Entries */}
       {['income', 'expense'].map(type => {
@@ -209,7 +230,12 @@ export default function PjTab() {
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               {type === 'income' ? '📈 Receitas' : '📉 Despesas PJ'}
             </h3>
-            {items.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum lançamento</p>}
+            {items.length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
+                <PackageOpen className="w-8 h-8" />
+                <p className="text-sm">Nenhum lançamento — toque em + para adicionar</p>
+              </div>
+            )}
             {items.map(entry => (
               <div key={entry.id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border group">
                 <div className="flex-1">
@@ -231,53 +257,77 @@ export default function PjTab() {
         );
       })}
 
-      {/* FAB with type selection */}
-      <div className="fixed bottom-20 right-4 flex flex-col gap-2 z-40">
-        <button onClick={() => { setFormType('income'); setShowForm(true); }} className="w-12 h-12 rounded-full bg-success text-success-foreground shadow-lg flex items-center justify-center text-lg">+</button>
-        <button onClick={() => { setFormType('expense'); setShowForm(true); }} className="w-12 h-12 rounded-full bg-destructive text-destructive-foreground shadow-lg flex items-center justify-center text-lg">−</button>
-      </div>
+      {/* Single FAB */}
+      <button
+        onClick={() => setShowForm(true)}
+        className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center z-40"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
 
-      {/* Form */}
-      <BottomSheet open={showForm} onClose={() => setShowForm(false)} title={formType === 'income' ? 'Nova Receita' : 'Nova Despesa PJ'}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm text-muted-foreground">Descrição *</label>
-            <input value={desc} onChange={e => setDesc(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" required />
+      {/* Form with toggle */}
+      <BottomSheet open={showForm} onClose={() => setShowForm(false)} title="Novo Lançamento PJ">
+        <div className="space-y-4">
+          {/* Type toggle */}
+          <div className="flex rounded-xl bg-secondary p-1">
+            <button
+              type="button"
+              onClick={() => setFormType('income')}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${formType === 'income' ? 'bg-success text-success-foreground' : 'text-muted-foreground'}`}
+            >
+              Receita
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormType('expense')}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${formType === 'expense' ? 'bg-destructive text-destructive-foreground' : 'text-muted-foreground'}`}
+            >
+              Despesa
+            </button>
           </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Valor (R$) *</label>
-            <input type="number" step="0.01" value={value} onChange={e => setValue(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" required />
-          </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Data</label>
-            <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" />
-          </div>
-          <div>
-            <label className="text-sm text-muted-foreground">Categoria</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm">
-              <option value="">Selecionar</option>
-              {formType === 'income'
-                ? PJ_INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)
-                : PJ_EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.label}>{c.label}</option>)
-              }
-            </select>
-          </div>
-          {formType === 'income' && (
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm text-muted-foreground">Cliente</label>
-              <input value={client} onChange={e => setClient(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" />
+              <label className="text-sm text-muted-foreground">Descrição *</label>
+              <input value={desc} onChange={e => setDesc(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" required />
             </div>
-          )}
-          {formType === 'expense' && (
             <div>
-              <label className="text-sm text-muted-foreground">Forma de pagamento</label>
-              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm">
-                {PAYMENT_METHODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              <label className="text-sm text-muted-foreground">Valor (R$) *</label>
+              <input type="number" step="0.01" value={value} onChange={e => setValue(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" required />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Data</label>
+              <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Categoria</label>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm">
+                <option value="">Selecionar</option>
+                {formType === 'income'
+                  ? PJ_INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)
+                  : PJ_EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.label}>{c.label}</option>)
+                }
               </select>
             </div>
-          )}
-          <button type="submit" className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold">Adicionar</button>
-        </form>
+            {formType === 'income' && (
+              <div>
+                <label className="text-sm text-muted-foreground">Cliente</label>
+                <input value={client} onChange={e => setClient(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" />
+              </div>
+            )}
+            {formType === 'expense' && (
+              <div>
+                <label className="text-sm text-muted-foreground">Forma de pagamento</label>
+                <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm">
+                  {PAYMENT_METHODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+            )}
+            <button type="submit" disabled={saving} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50">
+              {saving ? 'Salvando...' : 'Adicionar'}
+            </button>
+          </form>
+        </div>
       </BottomSheet>
 
       {/* Goal Form */}

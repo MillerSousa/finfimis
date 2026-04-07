@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/contexts/AppContext';
 import { PROFILE_COLORS, PIX_KEY_TYPES } from '@/lib/constants';
-import { Edit, Trash2, Plus, Copy, Sun, Moon } from 'lucide-react';
+import { Edit, Trash2, Plus, Copy, Sun, Moon, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import BottomSheet from '@/components/BottomSheet';
 import type { Tables } from '@/integrations/supabase/types';
@@ -18,6 +18,7 @@ export default function ConfigTab() {
   const [showPixForm, setShowPixForm] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [editingPix, setEditingPix] = useState<PixKey | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Profile form
   const [profileName, setProfileName] = useState('');
@@ -28,6 +29,12 @@ export default function ConfigTab() {
   const [pixValue, setPixValue] = useState('');
   const [pixLabel, setPixLabel] = useState('');
   const [pixIsPrimary, setPixIsPrimary] = useState(false);
+
+  // Notification prefs
+  const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem('mg-notif-enabled') === 'true');
+  const [notifDueDay, setNotifDueDay] = useState(() => localStorage.getItem('mg-notif-dueday') !== 'false');
+  const [notifOverdue, setNotifOverdue] = useState(() => localStorage.getItem('mg-notif-overdue') !== 'false');
+  const [notifReminder, setNotifReminder] = useState(() => localStorage.getItem('mg-notif-reminder') !== 'false');
 
   useEffect(() => {
     loadProfiles();
@@ -46,30 +53,23 @@ export default function ConfigTab() {
   };
 
   const openProfileForm = (profile?: Profile) => {
-    if (profile) {
-      setEditingProfile(profile);
-      setProfileName(profile.name);
-      setProfileColor(profile.color);
-    } else {
-      setEditingProfile(null);
-      setProfileName('');
-      setProfileColor('#3B82F6');
-    }
+    if (profile) { setEditingProfile(profile); setProfileName(profile.name); setProfileColor(profile.color); }
+    else { setEditingProfile(null); setProfileName(''); setProfileColor('#3B82F6'); }
     setShowProfileForm(true);
   };
 
   const saveProfile = async () => {
     if (!profileName) return;
+    setSaving(true);
     if (editingProfile) {
       await supabase.from('profiles').update({ name: profileName, color: profileColor }).eq('id', editingProfile.id);
-      if (activeProfile?.id === editingProfile.id) {
-        setActiveProfile({ ...activeProfile, name: profileName, color: profileColor });
-      }
+      if (activeProfile?.id === editingProfile.id) setActiveProfile({ ...activeProfile, name: profileName, color: profileColor });
       toast.success('Perfil atualizado');
     } else {
       await supabase.from('profiles').insert({ name: profileName, color: profileColor });
       toast.success('Perfil adicionado');
     }
+    setSaving(false);
     setShowProfileForm(false);
     loadProfiles();
   };
@@ -84,28 +84,15 @@ export default function ConfigTab() {
   };
 
   const openPixForm = (pix?: PixKey) => {
-    if (pix) {
-      setEditingPix(pix);
-      setPixType(pix.type);
-      setPixValue(pix.key_value);
-      setPixLabel(pix.label || '');
-      setPixIsPrimary(pix.is_primary ?? false);
-    } else {
-      setEditingPix(null);
-      setPixType('cpf');
-      setPixValue('');
-      setPixLabel('');
-      setPixIsPrimary(false);
-    }
+    if (pix) { setEditingPix(pix); setPixType(pix.type); setPixValue(pix.key_value); setPixLabel(pix.label || ''); setPixIsPrimary(pix.is_primary ?? false); }
+    else { setEditingPix(null); setPixType('cpf'); setPixValue(''); setPixLabel(''); setPixIsPrimary(false); }
     setShowPixForm(true);
   };
 
   const savePix = async () => {
     if (!pixValue || !activeProfile) return;
-    // If setting as primary, unset others first
-    if (pixIsPrimary) {
-      await supabase.from('pix_keys').update({ is_primary: false }).eq('profile_id', activeProfile.id);
-    }
+    setSaving(true);
+    if (pixIsPrimary) await supabase.from('pix_keys').update({ is_primary: false }).eq('profile_id', activeProfile.id);
     if (editingPix) {
       await supabase.from('pix_keys').update({ type: pixType, key_value: pixValue, label: pixLabel || null, is_primary: pixIsPrimary }).eq('id', editingPix.id);
       toast.success('Chave PIX atualizada');
@@ -113,6 +100,7 @@ export default function ConfigTab() {
       await supabase.from('pix_keys').insert({ profile_id: activeProfile.id, type: pixType, key_value: pixValue, label: pixLabel || null, is_primary: pixIsPrimary });
       toast.success('Chave PIX adicionada');
     }
+    setSaving(false);
     setShowPixForm(false);
     loadPixKeys();
   };
@@ -128,18 +116,37 @@ export default function ConfigTab() {
     toast.success('Chave PIX copiada!');
   };
 
+  const toggleNotifications = async (val: boolean) => {
+    if (val) {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        toast.error('Permissão de notificação negada pelo navegador');
+        return;
+      }
+    }
+    setNotifEnabled(val);
+    localStorage.setItem('mg-notif-enabled', String(val));
+  };
+
+  const setNotifPref = (key: string, setter: (v: boolean) => void, val: boolean) => {
+    setter(val);
+    localStorage.setItem(key, String(val));
+  };
+
   const exportData = async () => {
     if (!activeProfile) return;
+    const m = new Date().getMonth() + 1;
+    const y = new Date().getFullYear();
     const [exp, rec, pj] = await Promise.all([
-      supabase.from('expenses').select('*').eq('profile_id', activeProfile.id).eq('month', new Date().getMonth() + 1).eq('year', new Date().getFullYear()),
-      supabase.from('receivables').select('*').eq('profile_id', activeProfile.id).eq('month', new Date().getMonth() + 1).eq('year', new Date().getFullYear()),
-      supabase.from('pj_entries').select('*').eq('profile_id', activeProfile.id).eq('month', new Date().getMonth() + 1).eq('year', new Date().getFullYear()),
+      supabase.from('expenses').select('*').eq('profile_id', activeProfile.id).eq('month', m).eq('year', y),
+      supabase.from('receivables').select('*').eq('profile_id', activeProfile.id).eq('month', m).eq('year', y),
+      supabase.from('pj_entries').select('*').eq('profile_id', activeProfile.id).eq('month', m).eq('year', y),
     ]);
     const data = { expenses: exp.data, receivables: rec.data, pj_entries: pj.data };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `minha-grana-${activeProfile.name}-${new Date().getMonth() + 1}-${new Date().getFullYear()}.json`;
+    a.href = url; a.download = `minha-grana-${activeProfile.name}-${m}-${y}.json`;
     a.click();
     toast.success('Dados exportados');
   };
@@ -190,6 +197,17 @@ export default function ConfigTab() {
         </button>
       </section>
 
+      {/* Notifications */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Notificações</h3>
+        <div className="space-y-1 rounded-xl bg-card border border-border overflow-hidden">
+          <NotifToggle label="Ativar notificações push" icon={<Bell className="w-4 h-4 text-foreground" />} value={notifEnabled} onChange={toggleNotifications} />
+          <NotifToggle label="Avisar no dia do vencimento" value={notifDueDay} onChange={v => setNotifPref('mg-notif-dueday', setNotifDueDay, v)} disabled={!notifEnabled} />
+          <NotifToggle label="Avisar despesas vencidas (2 dias)" value={notifOverdue} onChange={v => setNotifPref('mg-notif-overdue', setNotifOverdue, v)} disabled={!notifEnabled} />
+          <NotifToggle label="Lembretes de cobrança" value={notifReminder} onChange={v => setNotifPref('mg-notif-reminder', setNotifReminder, v)} disabled={!notifEnabled} />
+        </div>
+      </section>
+
       {/* Appearance */}
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Aparência</h3>
@@ -229,7 +247,9 @@ export default function ConfigTab() {
               ))}
             </div>
           </div>
-          <button onClick={saveProfile} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold">Salvar</button>
+          <button onClick={saveProfile} disabled={saving} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50">
+            {saving ? 'Salvando...' : 'Salvar'}
+          </button>
         </div>
       </BottomSheet>
 
@@ -256,9 +276,31 @@ export default function ConfigTab() {
               <div className={`w-5 h-5 rounded-full bg-foreground transition-transform ${pixIsPrimary ? 'translate-x-6' : 'translate-x-0.5'}`} />
             </button>
           </div>
-          <button onClick={savePix} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold">Salvar</button>
+          <button onClick={savePix} disabled={saving} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50">
+            {saving ? 'Salvando...' : 'Salvar'}
+          </button>
         </div>
       </BottomSheet>
+    </div>
+  );
+}
+
+function NotifToggle({ label, icon, value, onChange, disabled }: {
+  label: string; icon?: React.ReactNode; value: boolean; onChange: (v: boolean) => void; disabled?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between p-3 ${disabled ? 'opacity-40' : ''}`}>
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className="text-sm text-foreground">{label}</span>
+      </div>
+      <button
+        disabled={disabled}
+        onClick={() => onChange(!value)}
+        className={`w-12 h-6 rounded-full transition-colors ${value ? 'bg-primary' : 'bg-secondary'}`}
+      >
+        <div className={`w-5 h-5 rounded-full bg-foreground transition-transform ${value ? 'translate-x-6' : 'translate-x-0.5'}`} />
+      </button>
     </div>
   );
 }

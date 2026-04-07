@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency } from '@/lib/constants';
-import { Copy, Send, Plus, History, Edit, Trash2 } from 'lucide-react';
+import { Copy, Send, Plus, History, Edit, Trash2, Mail, Bell, PackageOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import BottomSheet from '@/components/BottomSheet';
@@ -30,6 +30,7 @@ export default function CobrancasTab() {
   const [email, setEmail] = useState('');
   const [isRecurring, setIsRecurring] = useState(true);
   const [dueDay, setDueDay] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (activeProfile) loadData();
@@ -46,18 +47,14 @@ export default function CobrancasTab() {
     setLoading(false);
   };
 
-  const getMonthStatus = (debtorId: string) => {
-    return history.find(h => h.debtor_id === debtorId);
-  };
+  const getMonthStatus = (debtorId: string) => history.find(h => h.debtor_id === debtorId);
 
   const toggleReceived = async (debtor: Debtor) => {
     const existing = getMonthStatus(debtor.id);
     if (existing) {
       await supabase.from('collection_history').update({ is_received: !existing.is_received }).eq('id', existing.id);
     } else {
-      await supabase.from('collection_history').insert({
-        debtor_id: debtor.id, month: currentMonth, year: currentYear, is_received: true,
-      });
+      await supabase.from('collection_history').insert({ debtor_id: debtor.id, month: currentMonth, year: currentYear, is_received: true });
     }
     loadData();
     toast.success('Status atualizado');
@@ -69,23 +66,18 @@ export default function CobrancasTab() {
   };
 
   const generateMessage = async (debtor: Debtor) => {
-    // Get user's primary PIX key
     const { data: pixKeys } = await supabase.from('pix_keys').select('*')
       .eq('profile_id', activeProfile!.id).order('is_primary', { ascending: false }).limit(1);
     const myPixKey = pixKeys?.[0]?.key_value ?? '[sua chave PIX]';
-
     const msg = `Oi ${debtor.name}! Tudo bem? Passando para lembrar do pagamento de ${formatCurrency(Number(debtor.monthly_value || 0))}${debtor.description ? ` referente a ${debtor.description}` : ''}. Minha chave PIX é ${myPixKey}. Qualquer dúvida, é só falar! 😊`;
     navigator.clipboard.writeText(msg);
     toast.success('Mensagem copiada!');
-    
-    // Log reminder
+
     const existing = getMonthStatus(debtor.id);
     if (existing) {
       await supabase.from('collection_history').update({ reminder_sent_at: new Date().toISOString(), reminder_method: 'copy' }).eq('id', existing.id);
     } else {
-      await supabase.from('collection_history').insert({
-        debtor_id: debtor.id, month: currentMonth, year: currentYear, reminder_sent_at: new Date().toISOString(), reminder_method: 'copy',
-      });
+      await supabase.from('collection_history').insert({ debtor_id: debtor.id, month: currentMonth, year: currentYear, reminder_sent_at: new Date().toISOString(), reminder_method: 'copy' });
     }
     setShowReminder(null);
     loadData();
@@ -118,14 +110,13 @@ export default function CobrancasTab() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !activeProfile) return;
+    setSaving(true);
     const data = {
-      profile_id: activeProfile.id,
-      name, description: description || null,
+      profile_id: activeProfile.id, name, description: description || null,
       monthly_value: monthlyValue ? parseFloat(monthlyValue) : null,
       pix_key: pixKey || null, email: email || null,
       is_recurring: isRecurring, due_day: dueDay ? parseInt(dueDay) : null,
     };
-
     if (editing) {
       await supabase.from('debtors').update(data).eq('id', editing.id);
       toast.success('Devedor atualizado');
@@ -133,6 +124,7 @@ export default function CobrancasTab() {
       await supabase.from('debtors').insert(data);
       toast.success('Devedor adicionado');
     }
+    setSaving(false);
     setShowForm(false);
     resetForm();
     loadData();
@@ -152,7 +144,12 @@ export default function CobrancasTab() {
 
   return (
     <div className="space-y-3 pb-4">
-      {debtors.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Nenhum devedor cadastrado</p>}
+      {debtors.length === 0 && (
+        <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+          <PackageOpen className="w-10 h-10" />
+          <p className="text-sm">Nenhum devedor cadastrado — toque em + para adicionar</p>
+        </div>
+      )}
 
       {debtors.map(debtor => {
         const status = getMonthStatus(debtor.id);
@@ -166,7 +163,6 @@ export default function CobrancasTab() {
               </div>
               <span className="text-lg font-bold text-primary">{formatCurrency(Number(debtor.monthly_value || 0))}</span>
             </div>
-
             <div className="flex items-center gap-2 flex-wrap">
               {debtor.pix_key && (
                 <button onClick={() => copyPixKey(debtor.pix_key!)} className="flex items-center gap-1 px-2 py-1 rounded-md bg-secondary text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -182,7 +178,6 @@ export default function CobrancasTab() {
                 </span>
               )}
             </div>
-
             <div className="flex items-center gap-2">
               <button onClick={() => setShowReminder(debtor)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium">
                 <Send className="w-3 h-3" /> Enviar lembrete
@@ -202,7 +197,7 @@ export default function CobrancasTab() {
         <Plus className="w-6 h-6" />
       </button>
 
-      {/* Add/Edit Debtor Form */}
+      {/* Add/Edit Form */}
       <BottomSheet open={showForm} onClose={() => { setShowForm(false); resetForm(); }} title={editing ? 'Editar Devedor' : 'Novo Devedor'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -235,19 +230,33 @@ export default function CobrancasTab() {
               <div className={`w-5 h-5 rounded-full bg-foreground transition-transform ${isRecurring ? 'translate-x-6' : 'translate-x-0.5'}`} />
             </button>
           </div>
-          <button type="submit" className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold">
-            {editing ? 'Atualizar' : 'Adicionar'}
+          <button type="submit" disabled={saving} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50">
+            {saving ? 'Salvando...' : editing ? 'Atualizar' : 'Adicionar'}
           </button>
         </form>
       </BottomSheet>
 
-      {/* Reminder Modal */}
+      {/* Reminder Modal — 3 options */}
       <BottomSheet open={!!showReminder} onClose={() => setShowReminder(null)} title="Enviar Lembrete">
         {showReminder && (
           <div className="space-y-3">
             <button onClick={() => generateMessage(showReminder)} className="w-full p-4 rounded-xl bg-secondary text-left hover:bg-secondary/80 transition-colors">
               <p className="font-medium text-foreground">📋 Copiar mensagem</p>
               <p className="text-xs text-muted-foreground mt-1">Gera texto pronto para WhatsApp</p>
+            </button>
+            <button className="w-full p-4 rounded-xl bg-secondary text-left hover:bg-secondary/80 transition-colors opacity-60" disabled>
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-foreground" />
+                <p className="font-medium text-foreground">Enviar por email</p>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Em breve — requer configuração de email</p>
+            </button>
+            <button className="w-full p-4 rounded-xl bg-secondary text-left hover:bg-secondary/80 transition-colors opacity-60" disabled>
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-foreground" />
+                <p className="font-medium text-foreground">Agendar notificação push</p>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Ative notificações nas Configurações</p>
             </button>
           </div>
         )}

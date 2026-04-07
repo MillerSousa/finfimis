@@ -11,7 +11,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Sonner />
+      <Sonner position="bottom-center" duration={3000} />
       <AppProvider>
         <BrowserRouter>
           <Routes>
