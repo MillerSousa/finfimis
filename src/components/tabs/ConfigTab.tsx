@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/contexts/AppContext';
 import { PROFILE_COLORS, PIX_KEY_TYPES } from '@/lib/constants';
-import { Edit, Trash2, Plus, Copy, Sun, Moon, Bell } from 'lucide-react';
+import { Edit, Trash2, Plus, Copy, Sun, Moon, Bell, LogOut, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import BottomSheet from '@/components/BottomSheet';
 import type { Tables } from '@/integrations/supabase/types';
@@ -11,7 +11,7 @@ type Profile = Tables<'profiles'>;
 type PixKey = Tables<'pix_keys'>;
 
 export default function ConfigTab() {
-  const { activeProfile, setActiveProfile, theme, toggleTheme } = useApp();
+  const { activeProfile, theme, toggleTheme, signOut, user } = useApp();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [pixKeys, setPixKeys] = useState<PixKey[]>([]);
   const [showProfileForm, setShowProfileForm] = useState(false);
@@ -23,6 +23,10 @@ export default function ConfigTab() {
   // Profile form
   const [profileName, setProfileName] = useState('');
   const [profileColor, setProfileColor] = useState('#3B82F6');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profilePassword, setProfilePassword] = useState('');
+  const [profilePasswordConfirm, setProfilePasswordConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // PIX form
   const [pixType, setPixType] = useState('cpf');
@@ -41,9 +45,23 @@ export default function ConfigTab() {
     if (activeProfile) loadPixKeys();
   }, [activeProfile]);
 
+  const callAdminApi = async (body: Record<string, unknown>) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  };
+
   const loadProfiles = async () => {
-    const { data } = await supabase.from('profiles').select('*').order('created_at');
-    if (data) setProfiles(data);
+    const result = await callAdminApi({ action: 'list' });
+    if (result.profiles) setProfiles(result.profiles);
   };
 
   const loadPixKeys = async () => {
@@ -53,34 +71,102 @@ export default function ConfigTab() {
   };
 
   const openProfileForm = (profile?: Profile) => {
-    if (profile) { setEditingProfile(profile); setProfileName(profile.name); setProfileColor(profile.color); }
-    else { setEditingProfile(null); setProfileName(''); setProfileColor('#3B82F6'); }
+    if (profile) {
+      setEditingProfile(profile);
+      setProfileName(profile.name);
+      setProfileColor(profile.color);
+      setProfileEmail('');
+      setProfilePassword('');
+      setProfilePasswordConfirm('');
+    } else {
+      setEditingProfile(null);
+      setProfileName('');
+      setProfileColor('#3B82F6');
+      setProfileEmail('');
+      setProfilePassword('');
+      setProfilePasswordConfirm('');
+    }
     setShowProfileForm(true);
   };
 
   const saveProfile = async () => {
     if (!profileName) return;
-    setSaving(true);
-    if (editingProfile) {
-      await supabase.from('profiles').update({ name: profileName, color: profileColor }).eq('id', editingProfile.id);
-      if (activeProfile?.id === editingProfile.id) setActiveProfile({ ...activeProfile, name: profileName, color: profileColor });
-      toast.success('Perfil atualizado');
+
+    if (!editingProfile) {
+      // Creating new user
+      if (!profileEmail || !profilePassword) {
+        toast.error('Email e senha são obrigatórios para criar um usuário.');
+        return;
+      }
+      if (profilePassword.length < 6) {
+        toast.error('A senha deve ter pelo menos 6 caracteres.');
+        return;
+      }
+      if (profilePassword !== profilePasswordConfirm) {
+        toast.error('As senhas não coincidem.');
+        return;
+      }
     } else {
-      await supabase.from('profiles').insert({ name: profileName, color: profileColor });
-      toast.success('Perfil adicionado');
+      // Editing - validate password only if provided
+      if (profilePassword && profilePassword.length < 6) {
+        toast.error('A senha deve ter pelo menos 6 caracteres.');
+        return;
+      }
+      if (profilePassword && profilePassword !== profilePasswordConfirm) {
+        toast.error('As senhas não coincidem.');
+        return;
+      }
     }
+
+    setSaving(true);
+
+    if (editingProfile) {
+      const result = await callAdminApi({
+        action: 'update',
+        profileId: editingProfile.id,
+        name: profileName,
+        color: profileColor,
+        newPassword: profilePassword || undefined,
+      });
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success('Perfil atualizado');
+      }
+    } else {
+      const result = await callAdminApi({
+        action: 'create',
+        email: profileEmail,
+        password: profilePassword,
+        name: profileName,
+        color: profileColor,
+      });
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success(`Usuário ${profileName} criado com sucesso!`);
+      }
+    }
+
     setSaving(false);
     setShowProfileForm(false);
     loadProfiles();
   };
 
   const deleteProfile = async (profile: Profile) => {
-    if (profiles.length <= 1) { toast.error('Não é possível excluir o único perfil'); return; }
-    if (!confirm(`Excluir perfil "${profile.name}" e todos os dados associados?`)) return;
-    await supabase.from('profiles').delete().eq('id', profile.id);
-    if (activeProfile?.id === profile.id) setActiveProfile(null);
-    toast.success('Perfil excluído');
-    loadProfiles();
+    if (profiles.length <= 1) {
+      toast.error('Não é possível excluir o único perfil');
+      return;
+    }
+    if (!confirm(`Tem certeza? Todos os dados financeiros de "${profile.name}" serão excluídos permanentemente.`)) return;
+
+    const result = await callAdminApi({ action: 'delete', profileId: profile.id });
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Perfil excluído');
+      loadProfiles();
+    }
   };
 
   const openPixForm = (pix?: PixKey) => {
@@ -149,6 +235,11 @@ export default function ConfigTab() {
     a.href = url; a.download = `minha-grana-${activeProfile.name}-${m}-${y}.json`;
     a.click();
     toast.success('Dados exportados');
+  };
+
+  const handleLogout = async () => {
+    if (!confirm('Deseja sair?')) return;
+    await signOut();
   };
 
   return (
@@ -222,6 +313,15 @@ export default function ConfigTab() {
         </div>
       </section>
 
+      {/* Account */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Conta</h3>
+        <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3 rounded-xl bg-card border border-border text-sm text-destructive hover:bg-destructive/10 transition-colors">
+          <LogOut className="w-4 h-4" />
+          Sair da conta
+        </button>
+      </section>
+
       {/* Data */}
       <section className="space-y-3">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Dados</h3>
@@ -231,11 +331,43 @@ export default function ConfigTab() {
       </section>
 
       {/* Profile Form */}
-      <BottomSheet open={showProfileForm} onClose={() => setShowProfileForm(false)} title={editingProfile ? 'Editar Perfil' : 'Novo Perfil'}>
+      <BottomSheet open={showProfileForm} onClose={() => setShowProfileForm(false)} title={editingProfile ? 'Editar Perfil' : 'Novo Usuário'}>
         <div className="space-y-4">
           <div>
             <label className="text-sm text-muted-foreground">Nome *</label>
             <input value={profileName} onChange={e => setProfileName(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" />
+          </div>
+          {!editingProfile && (
+            <div>
+              <label className="text-sm text-muted-foreground">Email *</label>
+              <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm" placeholder="email@exemplo.com" />
+            </div>
+          )}
+          <div>
+            <label className="text-sm text-muted-foreground">{editingProfile ? 'Nova senha (opcional)' : 'Senha *'}</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={profilePassword}
+                onChange={e => setProfilePassword(e.target.value)}
+                className="w-full mt-1 p-2.5 pr-10 rounded-lg bg-secondary border border-border text-foreground text-sm"
+                placeholder={editingProfile ? 'Deixe vazio para manter' : 'Mínimo 6 caracteres'}
+              />
+              <button type="button" onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 mt-0.5 text-muted-foreground">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">{editingProfile ? 'Repetir nova senha' : 'Repetir senha *'}</label>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={profilePasswordConfirm}
+              onChange={e => setProfilePasswordConfirm(e.target.value)}
+              className="w-full mt-1 p-2.5 rounded-lg bg-secondary border border-border text-foreground text-sm"
+              placeholder="Confirme a senha"
+            />
           </div>
           <div>
             <label className="text-sm text-muted-foreground">Cor do avatar</label>
@@ -247,7 +379,8 @@ export default function ConfigTab() {
               ))}
             </div>
           </div>
-          <button onClick={saveProfile} disabled={saving} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50">
+          <button onClick={saveProfile} disabled={saving} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
