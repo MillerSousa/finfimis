@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import ProfileSelect from '@/components/ProfileSelect';
+import Login from '@/pages/Login';
 import AppHeader from '@/components/AppHeader';
 import BottomNav, { TabId } from '@/components/BottomNav';
 import PessoalTab from '@/components/tabs/PessoalTab';
@@ -8,12 +8,32 @@ import CartoesTab from '@/components/tabs/CartoesTab';
 import CobrancasTab from '@/components/tabs/CobrancasTab';
 import PjTab from '@/components/tabs/PjTab';
 import ConfigTab from '@/components/tabs/ConfigTab';
+import { Loader2 } from 'lucide-react';
 
 export default function Index() {
-  const { activeProfile } = useApp();
+  const { user, activeProfile, authLoading } = useApp();
   const [activeTab, setActiveTab] = useState<TabId>('pessoal');
 
-  if (!activeProfile) return <ProfileSelect />;
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) return <Login />;
+
+  if (!activeProfile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-foreground">💰 Minha Grana</h1>
+          <p className="text-muted-foreground text-sm">Perfil não encontrado. Contate o administrador.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

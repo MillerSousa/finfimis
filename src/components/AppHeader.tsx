@@ -1,9 +1,9 @@
 import { useApp } from '@/contexts/AppContext';
-import { ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { MONTH_NAMES } from '@/lib/constants';
 
 export default function AppHeader() {
-  const { activeProfile, setActiveProfile, currentMonth, currentYear, navigateMonth } = useApp();
+  const { activeProfile, currentMonth, currentYear, navigateMonth } = useApp();
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
@@ -21,10 +21,7 @@ export default function AppHeader() {
         </div>
 
         {activeProfile && (
-          <button
-            onClick={() => setActiveProfile(null)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
-          >
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary">
             <div
               className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
               style={{ backgroundColor: activeProfile.color + '30', color: activeProfile.color }}
@@ -32,8 +29,7 @@ export default function AppHeader() {
               {activeProfile.name.charAt(0)}
             </div>
             <span className="text-xs font-medium text-foreground">{activeProfile.name}</span>
-            <ArrowLeftRight className="w-3 h-3 text-muted-foreground" />
-          </button>
+          </div>
         )}
       </div>
     </header>

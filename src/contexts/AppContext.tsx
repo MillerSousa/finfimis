@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import type { User, Session } from '@supabase/supabase-js';
 
 type Profile = Tables<'profiles'>;
 
 interface AppContextType {
+  user: User | null;
+  session: Session | null;
   activeProfile: Profile | null;
-  setActiveProfile: (profile: Profile | null) => void;
   currentMonth: number;
   currentYear: number;
   setMonth: (month: number) => void;
@@ -13,13 +16,18 @@ interface AppContextType {
   navigateMonth: (direction: -1 | 1) => void;
   theme: 'dark' | 'light';
   toggleTheme: () => void;
+  signOut: () => Promise<void>;
+  authLoading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const now = new Date();
-  const [activeProfile, setActiveProfileState] = useState<Profile | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [currentMonth, setMonth] = useState(now.getMonth() + 1);
   const [currentYear, setYear] = useState(now.getFullYear());
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -31,14 +39,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('mg-theme', theme);
   }, [theme]);
 
-  const setActiveProfile = (profile: Profile | null) => {
-    setActiveProfileState(profile);
-    if (profile) {
-      localStorage.setItem('mg-active-profile', profile.id);
-    } else {
-      localStorage.removeItem('mg-active-profile');
-    }
-  };
+  // Auth state listener - set up BEFORE getSession
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+
+        if (event === 'SIGNED_OUT') {
+          setActiveProfile(null);
+          setAuthLoading(false);
+        } else if (newSession?.user) {
+          // Fetch profile for this user
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('auth_user_id', newSession.user.id)
+            .maybeSingle();
+          setActiveProfile(profile);
+          setAuthLoading(false);
+        } else {
+          setAuthLoading(false);
+        }
+      }
+    );
+
+    // Then check existing session
+    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      if (!existingSession) {
+        setAuthLoading(false);
+      }
+      // onAuthStateChange will handle setting state
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const navigateMonth = (direction: -1 | 1) => {
     let newMonth = currentMonth + direction;
@@ -51,11 +86,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setActiveProfile(null);
+    setUser(null);
+    setSession(null);
+  };
+
   return (
     <AppContext.Provider value={{
-      activeProfile, setActiveProfile,
+      user, session, activeProfile,
       currentMonth, currentYear, setMonth, setYear, navigateMonth,
-      theme, toggleTheme,
+      theme, toggleTheme, signOut, authLoading,
     }}>
       {children}
     </AppContext.Provider>

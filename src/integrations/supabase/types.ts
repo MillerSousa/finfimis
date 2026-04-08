@@ -340,18 +340,21 @@ export type Database = {
       }
       profiles: {
         Row: {
+          auth_user_id: string | null
           color: string
           created_at: string | null
           id: string
           name: string
         }
         Insert: {
+          auth_user_id?: string | null
           color?: string
           created_at?: string | null
           id?: string
           name: string
         }
         Update: {
+          auth_user_id?: string | null
           color?: string
           created_at?: string | null
           id?: string
@@ -417,7 +420,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_my_profile_id: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
