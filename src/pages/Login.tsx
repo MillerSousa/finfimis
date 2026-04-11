@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import money3d from '@/assets/money-3d.png';
 import { supabase } from '@/integrations/supabase/client';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -49,7 +50,8 @@ export default function Login() {
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm space-y-6 animate-fade-in">
           <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-foreground">💰 Minha Grana</h1>
+            <img src={money3d} alt="Minha Grana" width={64} height={64} className="mx-auto" />
+            <h1 className="text-3xl font-bold text-foreground">Minha Grana</h1>
             <p className="text-muted-foreground text-sm">Redefinir senha</p>
           </div>
           <form onSubmit={handleForgotPassword} className="space-y-4">
@@ -82,7 +84,8 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6 animate-fade-in">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">💰 Minha Grana</h1>
+          <img src={money3d} alt="Minha Grana" width={64} height={64} className="mx-auto" />
+          <h1 className="text-3xl font-bold text-foreground">Minha Grana</h1>
           <p className="text-muted-foreground text-sm">Controle financeiro do seu jeito</p>
         </div>
 

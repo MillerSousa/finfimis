@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import money3d from '@/assets/money-3d.png';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -47,7 +48,8 @@ export default function ResetPassword() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold text-foreground">💰 Minha Grana</h1>
+          <img src={money3d} alt="Minha Grana" width={48} height={48} className="mx-auto" />
+          <h1 className="text-2xl font-bold text-foreground">Minha Grana</h1>
           <p className="text-muted-foreground text-sm">Verificando link de redefinição...</p>
           <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
         </div>
@@ -59,7 +61,8 @@ export default function ResetPassword() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6 animate-fade-in">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">💰 Minha Grana</h1>
+          <img src={money3d} alt="Minha Grana" width={64} height={64} className="mx-auto" />
+          <h1 className="text-3xl font-bold text-foreground">Minha Grana</h1>
           <p className="text-muted-foreground text-sm">Definir nova senha</p>
         </div>
         <form onSubmit={handleReset} className="space-y-4">
