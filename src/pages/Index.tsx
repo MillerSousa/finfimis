@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import money3d from '@/assets/money-3d.png';
 import { useApp } from '@/contexts/AppContext';
 import Login from '@/pages/Login';
 import AppHeader from '@/components/AppHeader';
@@ -28,7 +29,8 @@ export default function Index() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold text-foreground">💰 Minha Grana</h1>
+          <img src={money3d} alt="Minha Grana" width={48} height={48} className="mx-auto" />
+          <h1 className="text-2xl font-bold text-foreground">Minha Grana</h1>
           <p className="text-muted-foreground text-sm">Perfil não encontrado. Contate o administrador.</p>
         </div>
       </div>
