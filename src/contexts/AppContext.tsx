@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import type { User, Session } from '@supabase/supabase-js';
+import { useTabSync } from '@/hooks/useTabSync';
 
 type Profile = Tables<'profiles'>;
 
@@ -33,6 +34,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('mg-theme') as 'dark' | 'light') || 'dark';
   });
+
+  // Corrige bug de aba inativa: refresh de token + reconexão de canais Realtime
+  useTabSync();
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
