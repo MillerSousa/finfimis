@@ -391,9 +391,33 @@ export default function PessoalTab() {
             <button onClick={() => copyPixKey(r)} className="p-1.5 rounded hover:bg-secondary" title="Copiar PIX">
               <Copy className="w-4 h-4 text-muted-foreground" />
             </button>
-            <button onClick={() => setShowReminder(r)} className="p-1.5 rounded hover:bg-secondary" title="Lembrar">
+            <button onClick={() => openReminder(r)} className="p-1.5 rounded hover:bg-secondary" title="Lembrar">
               <Bell className="w-4 h-4 text-muted-foreground" />
             </button>
+            <ActionMenu
+              items={[
+                {
+                  label: r.is_received ? 'Marcar como Pendente' : 'Marcar como Recebido',
+                  icon: r.is_received ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />,
+                  onClick: () => toggleReceived(r),
+                  variant: 'success',
+                },
+                { label: 'Copiar PIX', icon: <Copy className="w-4 h-4" />, onClick: () => copyPixKey(r) },
+                { label: 'Lembrar', icon: <Bell className="w-4 h-4" />, onClick: () => openReminder(r) },
+                { label: 'Editar', icon: <Edit className="w-4 h-4" />, onClick: () => { setEditingReceivable(r); setShowReceivableForm(true); } },
+                { label: 'Excluir', icon: <Trash2 className="w-4 h-4" />, onClick: () => setConfirmDeleteReceivable(r), variant: 'destructive' },
+              ]}
+              desktopInline={
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => { setEditingReceivable(r); setShowReceivableForm(true); }} className="p-1.5 rounded hover:bg-secondary" title="Editar">
+                    <Edit className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => setConfirmDeleteReceivable(r)} className="p-1.5 rounded hover:bg-secondary" title="Excluir">
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </button>
+                </div>
+              }
+            />
           </div>
         ))}
       </div>
@@ -418,10 +442,46 @@ export default function PessoalTab() {
       <BottomSheet open={!!showReminder} onClose={() => setShowReminder(null)} title={`Lembrar — ${showReminder?.person_name}`}>
         {showReminder && (
           <div className="space-y-3">
-            <button onClick={() => generateReminderMessage(showReminder)} className="w-full p-4 rounded-xl bg-secondary text-left hover:bg-secondary/80 transition-colors">
-              <p className="font-medium text-foreground">📋 Copiar mensagem</p>
-              <p className="text-xs text-muted-foreground mt-1">Gera texto pronto para WhatsApp</p>
-            </button>
+            <label className="text-sm text-muted-foreground">Mensagem (você pode editar)</label>
+            <textarea
+              value={reminderText}
+              onChange={e => setReminderText(e.target.value)}
+              rows={6}
+              className="w-full p-3 rounded-lg bg-secondary border border-border text-foreground text-sm resize-none"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={copyReminder} className="p-3 rounded-xl bg-secondary text-foreground font-semibold hover:bg-secondary/80 transition-colors">
+                📋 Copiar
+              </button>
+              <button onClick={sendReminderWhatsApp} className="p-3 rounded-xl bg-success text-success-foreground font-semibold hover:bg-success/90 transition-colors">
+                💬 WhatsApp
+              </button>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
+
+      {/* Confirm delete receivable */}
+      <BottomSheet open={!!confirmDeleteReceivable} onClose={() => setConfirmDeleteReceivable(null)} title="Excluir recebível?">
+        {confirmDeleteReceivable && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja excluir o recebível de <strong className="text-foreground">{confirmDeleteReceivable.person_name}</strong>? Esta ação não pode ser desfeita.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setConfirmDeleteReceivable(null)} className="p-3 rounded-xl bg-secondary text-foreground font-semibold">
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  await deleteReceivable(confirmDeleteReceivable.id);
+                  setConfirmDeleteReceivable(null);
+                }}
+                className="p-3 rounded-xl bg-destructive text-destructive-foreground font-semibold"
+              >
+                Excluir
+              </button>
+            </div>
           </div>
         )}
       </BottomSheet>
