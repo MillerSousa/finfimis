@@ -35,6 +35,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return (localStorage.getItem('mg-theme') as 'dark' | 'light') || 'dark';
   });
 
+  // Corrige bug de aba inativa: refresh de token + reconexão de canais Realtime
+  useTabSync();
+
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
     localStorage.setItem('mg-theme', theme);
