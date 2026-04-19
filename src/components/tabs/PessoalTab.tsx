@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, getCategoryIcon, getPaymentMethodInfo, MONTH_NAMES } from '@/lib/constants';
-import { Plus, Copy, Bell, ArrowUpDown, PackageOpen } from 'lucide-react';
+import { Plus, Copy, Bell, ArrowUpDown, PackageOpen, Edit, Trash2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import BottomSheet from '@/components/BottomSheet';
 import ExpenseForm from '@/components/ExpenseForm';
 import ReceivableForm from '@/components/ReceivableForm';
 import SwipeableExpenseItem from '@/components/SwipeableExpenseItem';
+import ActionMenu from '@/components/ActionMenu';
 import type { Tables } from '@/integrations/supabase/types';
 import {
   DndContext,
@@ -69,6 +70,8 @@ export default function PessoalTab() {
   const [sortBy, setSortBy] = useState<'manual' | 'due' | 'value' | 'name'>('manual');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showReminder, setShowReminder] = useState<Receivable | null>(null);
+  const [reminderText, setReminderText] = useState('');
+  const [confirmDeleteReceivable, setConfirmDeleteReceivable] = useState<Receivable | null>(null);
   const hasReplicatedRef = useRef(false);
 
   const sensors = useSensors(
@@ -203,18 +206,29 @@ export default function PessoalTab() {
     }
   };
 
-  const generateReminderMessage = async (r: Receivable) => {
-    let msg = `Oi ${r.person_name}! Tudo bem? Passando para lembrar do pagamento de ${formatCurrency(Number(r.value || 0))}`;
-    if (r.parcel_current && r.parcel_total) msg += ` — parcela ${r.parcel_current}/${r.parcel_total}`;
-    msg += `. Qualquer dúvida é só falar! 😊`;
+  const openReminder = async (r: Receivable) => {
+    let msg = `Oi ${r.person_name}! Você me deve ${formatCurrency(Number(r.value || 0))}`;
+    if (r.parcel_current && r.parcel_total) msg += ` (parcela ${r.parcel_current}/${r.parcel_total})`;
+    if (r.pix_key) {
+      msg += `\nChave PIX: ${r.pix_key}`;
+    } else {
+      const { data: pixKeys } = await supabase.from('pix_keys').select('*')
+        .eq('profile_id', activeProfile!.id).order('is_primary', { ascending: false }).limit(1);
+      if (pixKeys?.[0]) msg += `\nChave PIX: ${pixKeys[0].key_value}`;
+    }
+    msg += `\nQualquer dúvida é só falar! 😊`;
+    setReminderText(msg);
+    setShowReminder(r);
+  };
 
-    // Get primary PIX key
-    const { data: pixKeys } = await supabase.from('pix_keys').select('*')
-      .eq('profile_id', activeProfile!.id).order('is_primary', { ascending: false }).limit(1);
-    if (pixKeys?.[0]) msg += `\nMinha chave PIX: ${pixKeys[0].key_value}`;
-
-    navigator.clipboard.writeText(msg);
+  const copyReminder = () => {
+    navigator.clipboard.writeText(reminderText);
     toast.success('Mensagem copiada!');
+    setShowReminder(null);
+  };
+
+  const sendReminderWhatsApp = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(reminderText)}`, '_blank');
     setShowReminder(null);
   };
 
