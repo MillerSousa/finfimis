@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import type { User, Session } from '@supabase/supabase-js';
+import { useTabSync } from '@/hooks/useTabSync';
 
 type Profile = Tables<'profiles'>;
 
