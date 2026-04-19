@@ -73,7 +73,7 @@ export default function SwipeableExpenseItem({ expense, status, onTogglePaid, on
             {expense.is_recurring && <RefreshCw className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full text-foreground ${pmInfo.color}`}>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white ${pmInfo.color}`}>
               {pmInfo.label}
             </span>
             {expense.due_day && <span className="text-xs text-muted-foreground">Dia {expense.due_day}</span>}
