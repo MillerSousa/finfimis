@@ -45,38 +45,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Auth state listener - set up BEFORE getSession
   useEffect(() => {
+    let mounted = true;
+
+    // Helper: fetch profile for a user (deferred, nunca awaited dentro do callback de auth)
+    const fetchProfile = (userId: string) => {
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('auth_user_id', userId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (mounted) setActiveProfile(data ?? null);
+        });
+    };
+
+    // Listener: NUNCA usar await/async com supabase aqui dentro (causa deadlock)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
+      (event, newSession) => {
+        if (!mounted) return;
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
         if (event === 'SIGNED_OUT') {
           setActiveProfile(null);
-          setAuthLoading(false);
         } else if (newSession?.user) {
-          // Fetch profile for this user
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('auth_user_id', newSession.user.id)
-            .maybeSingle();
-          setActiveProfile(profile);
-          setAuthLoading(false);
-        } else {
-          setAuthLoading(false);
+          // Defer com setTimeout 0 para evitar deadlock no auth client
+          setTimeout(() => fetchProfile(newSession.user.id), 0);
         }
+        setAuthLoading(false);
       }
     );
 
-    // Then check existing session
+    // Restaurar sessão existente do storage
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      if (!existingSession) {
-        setAuthLoading(false);
+      if (!mounted) return;
+      setSession(existingSession);
+      setUser(existingSession?.user ?? null);
+      if (existingSession?.user) {
+        fetchProfile(existingSession.user.id);
       }
-      // onAuthStateChange will handle setting state
+      setAuthLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const navigateMonth = (direction: -1 | 1) => {
