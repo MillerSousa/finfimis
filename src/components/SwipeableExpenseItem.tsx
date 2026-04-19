@@ -40,21 +40,23 @@ export default function SwipeableExpenseItem({ expense, status, onTogglePaid, on
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card">
-      {/* Action buttons behind */}
-      <div className="absolute inset-y-0 right-0 flex">
-        <button
-          onClick={() => { onTogglePaid(expense); setOffsetX(0); }}
-          className="w-[70px] flex items-center justify-center bg-success text-success-foreground"
-        >
-          <Check className="w-5 h-5" />
-        </button>
-        <button
-          onClick={() => { onDelete(expense.id); setOffsetX(0); }}
-          className="w-[70px] flex items-center justify-center bg-destructive text-destructive-foreground"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
-      </div>
+      {/* Action buttons behind (only visible while swiping) */}
+      {offsetX < 0 && (
+        <div className="absolute inset-y-0 right-0 flex">
+          <button
+            onClick={() => { onTogglePaid(expense); setOffsetX(0); }}
+            className="w-[70px] flex items-center justify-center bg-success text-success-foreground"
+          >
+            <Check className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => { onDelete(expense.id); setOffsetX(0); }}
+            className="w-[70px] flex items-center justify-center bg-destructive text-destructive-foreground"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       {/* Main content */}
       <div
