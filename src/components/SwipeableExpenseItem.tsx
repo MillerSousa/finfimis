@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
-import { Check, Trash2, RefreshCw, Edit, Clock, AlertTriangle } from 'lucide-react';
+import { Check, Trash2, RefreshCw, Edit, Clock, AlertTriangle, X } from 'lucide-react';
 import { formatCurrency, getCategoryIcon, getPaymentMethodInfo } from '@/lib/constants';
+import ActionMenu from '@/components/ActionMenu';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Expense = Tables<'expenses'>;
@@ -86,17 +87,31 @@ export default function SwipeableExpenseItem({ expense, status, onTogglePaid, on
           <span className="text-sm font-semibold text-foreground">{formatCurrency(Number(expense.value))}</span>
           <StatusBadge status={status} />
         </div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onTogglePaid(expense)} className="p-1 rounded hover:bg-secondary">
-            <Check className="w-4 h-4 text-success" />
-          </button>
-          <button onClick={() => onEdit(expense)} className="p-1 rounded hover:bg-secondary">
-            <Edit className="w-4 h-4 text-muted-foreground" />
-          </button>
-          <button onClick={() => onDelete(expense.id)} className="p-1 rounded hover:bg-secondary">
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </button>
-        </div>
+        <ActionMenu
+          items={[
+            {
+              label: expense.is_paid ? 'Marcar como Pendente' : 'Marcar como Pago',
+              icon: expense.is_paid ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />,
+              onClick: () => onTogglePaid(expense),
+              variant: 'success',
+            },
+            { label: 'Editar', icon: <Edit className="w-4 h-4" />, onClick: () => onEdit(expense) },
+            { label: 'Excluir', icon: <Trash2 className="w-4 h-4" />, onClick: () => onDelete(expense.id), variant: 'destructive' },
+          ]}
+          desktopInline={
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => onTogglePaid(expense)} className="p-1 rounded hover:bg-secondary" title={expense.is_paid ? 'Marcar pendente' : 'Marcar pago'}>
+                {expense.is_paid ? <X className="w-4 h-4 text-warning" /> : <Check className="w-4 h-4 text-success" />}
+              </button>
+              <button onClick={() => onEdit(expense)} className="p-1 rounded hover:bg-secondary" title="Editar">
+                <Edit className="w-4 h-4 text-muted-foreground" />
+              </button>
+              <button onClick={() => onDelete(expense.id)} className="p-1 rounded hover:bg-secondary" title="Excluir">
+                <Trash2 className="w-4 h-4 text-destructive" />
+              </button>
+            </div>
+          }
+        />
       </div>
     </div>
   );

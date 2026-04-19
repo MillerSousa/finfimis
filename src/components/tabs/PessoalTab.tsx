@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, getCategoryIcon, getPaymentMethodInfo, MONTH_NAMES } from '@/lib/constants';
-import { Plus, Copy, Bell, ArrowUpDown, PackageOpen } from 'lucide-react';
+import { Plus, Copy, Bell, ArrowUpDown, PackageOpen, Edit, Trash2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import BottomSheet from '@/components/BottomSheet';
 import ExpenseForm from '@/components/ExpenseForm';
 import ReceivableForm from '@/components/ReceivableForm';
 import SwipeableExpenseItem from '@/components/SwipeableExpenseItem';
+import ActionMenu from '@/components/ActionMenu';
 import type { Tables } from '@/integrations/supabase/types';
 import {
   DndContext,
@@ -69,6 +70,8 @@ export default function PessoalTab() {
   const [sortBy, setSortBy] = useState<'manual' | 'due' | 'value' | 'name'>('manual');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showReminder, setShowReminder] = useState<Receivable | null>(null);
+  const [reminderText, setReminderText] = useState('');
+  const [confirmDeleteReceivable, setConfirmDeleteReceivable] = useState<Receivable | null>(null);
   const hasReplicatedRef = useRef(false);
 
   const sensors = useSensors(
@@ -203,18 +206,29 @@ export default function PessoalTab() {
     }
   };
 
-  const generateReminderMessage = async (r: Receivable) => {
-    let msg = `Oi ${r.person_name}! Tudo bem? Passando para lembrar do pagamento de ${formatCurrency(Number(r.value || 0))}`;
-    if (r.parcel_current && r.parcel_total) msg += ` — parcela ${r.parcel_current}/${r.parcel_total}`;
-    msg += `. Qualquer dúvida é só falar! 😊`;
+  const openReminder = async (r: Receivable) => {
+    let msg = `Oi ${r.person_name}! Você me deve ${formatCurrency(Number(r.value || 0))}`;
+    if (r.parcel_current && r.parcel_total) msg += ` (parcela ${r.parcel_current}/${r.parcel_total})`;
+    if (r.pix_key) {
+      msg += `\nChave PIX: ${r.pix_key}`;
+    } else {
+      const { data: pixKeys } = await supabase.from('pix_keys').select('*')
+        .eq('profile_id', activeProfile!.id).order('is_primary', { ascending: false }).limit(1);
+      if (pixKeys?.[0]) msg += `\nChave PIX: ${pixKeys[0].key_value}`;
+    }
+    msg += `\nQualquer dúvida é só falar! 😊`;
+    setReminderText(msg);
+    setShowReminder(r);
+  };
 
-    // Get primary PIX key
-    const { data: pixKeys } = await supabase.from('pix_keys').select('*')
-      .eq('profile_id', activeProfile!.id).order('is_primary', { ascending: false }).limit(1);
-    if (pixKeys?.[0]) msg += `\nMinha chave PIX: ${pixKeys[0].key_value}`;
-
-    navigator.clipboard.writeText(msg);
+  const copyReminder = () => {
+    navigator.clipboard.writeText(reminderText);
     toast.success('Mensagem copiada!');
+    setShowReminder(null);
+  };
+
+  const sendReminderWhatsApp = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(reminderText)}`, '_blank');
     setShowReminder(null);
   };
 
@@ -377,9 +391,33 @@ export default function PessoalTab() {
             <button onClick={() => copyPixKey(r)} className="p-1.5 rounded hover:bg-secondary" title="Copiar PIX">
               <Copy className="w-4 h-4 text-muted-foreground" />
             </button>
-            <button onClick={() => setShowReminder(r)} className="p-1.5 rounded hover:bg-secondary" title="Lembrar">
+            <button onClick={() => openReminder(r)} className="p-1.5 rounded hover:bg-secondary" title="Lembrar">
               <Bell className="w-4 h-4 text-muted-foreground" />
             </button>
+            <ActionMenu
+              items={[
+                {
+                  label: r.is_received ? 'Marcar como Pendente' : 'Marcar como Recebido',
+                  icon: r.is_received ? <X className="w-4 h-4" /> : <Check className="w-4 h-4" />,
+                  onClick: () => toggleReceived(r),
+                  variant: 'success',
+                },
+                { label: 'Copiar PIX', icon: <Copy className="w-4 h-4" />, onClick: () => copyPixKey(r) },
+                { label: 'Lembrar', icon: <Bell className="w-4 h-4" />, onClick: () => openReminder(r) },
+                { label: 'Editar', icon: <Edit className="w-4 h-4" />, onClick: () => { setEditingReceivable(r); setShowReceivableForm(true); } },
+                { label: 'Excluir', icon: <Trash2 className="w-4 h-4" />, onClick: () => setConfirmDeleteReceivable(r), variant: 'destructive' },
+              ]}
+              desktopInline={
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => { setEditingReceivable(r); setShowReceivableForm(true); }} className="p-1.5 rounded hover:bg-secondary" title="Editar">
+                    <Edit className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => setConfirmDeleteReceivable(r)} className="p-1.5 rounded hover:bg-secondary" title="Excluir">
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </button>
+                </div>
+              }
+            />
           </div>
         ))}
       </div>
@@ -404,10 +442,46 @@ export default function PessoalTab() {
       <BottomSheet open={!!showReminder} onClose={() => setShowReminder(null)} title={`Lembrar — ${showReminder?.person_name}`}>
         {showReminder && (
           <div className="space-y-3">
-            <button onClick={() => generateReminderMessage(showReminder)} className="w-full p-4 rounded-xl bg-secondary text-left hover:bg-secondary/80 transition-colors">
-              <p className="font-medium text-foreground">📋 Copiar mensagem</p>
-              <p className="text-xs text-muted-foreground mt-1">Gera texto pronto para WhatsApp</p>
-            </button>
+            <label className="text-sm text-muted-foreground">Mensagem (você pode editar)</label>
+            <textarea
+              value={reminderText}
+              onChange={e => setReminderText(e.target.value)}
+              rows={6}
+              className="w-full p-3 rounded-lg bg-secondary border border-border text-foreground text-sm resize-none"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={copyReminder} className="p-3 rounded-xl bg-secondary text-foreground font-semibold hover:bg-secondary/80 transition-colors">
+                📋 Copiar
+              </button>
+              <button onClick={sendReminderWhatsApp} className="p-3 rounded-xl bg-success text-success-foreground font-semibold hover:bg-success/90 transition-colors">
+                💬 WhatsApp
+              </button>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
+
+      {/* Confirm delete receivable */}
+      <BottomSheet open={!!confirmDeleteReceivable} onClose={() => setConfirmDeleteReceivable(null)} title="Excluir recebível?">
+        {confirmDeleteReceivable && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja excluir o recebível de <strong className="text-foreground">{confirmDeleteReceivable.person_name}</strong>? Esta ação não pode ser desfeita.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setConfirmDeleteReceivable(null)} className="p-3 rounded-xl bg-secondary text-foreground font-semibold">
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  await deleteReceivable(confirmDeleteReceivable.id);
+                  setConfirmDeleteReceivable(null);
+                }}
+                className="p-3 rounded-xl bg-destructive text-destructive-foreground font-semibold"
+              >
+                Excluir
+              </button>
+            </div>
           </div>
         )}
       </BottomSheet>
