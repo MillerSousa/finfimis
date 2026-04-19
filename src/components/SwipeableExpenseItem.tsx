@@ -39,7 +39,7 @@ export default function SwipeableExpenseItem({ expense, status, onTogglePaid, on
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card">
       {/* Action buttons behind */}
       <div className="absolute inset-y-0 right-0 flex">
         <button
@@ -58,7 +58,7 @@ export default function SwipeableExpenseItem({ expense, status, onTogglePaid, on
 
       {/* Main content */}
       <div
-        className="relative flex items-center gap-3 p-3 bg-card border border-border transition-transform group"
+        className="relative flex items-center gap-3 p-3 bg-card rounded-xl transition-transform group"
         style={{ transform: `translateX(${offsetX}px)` }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}

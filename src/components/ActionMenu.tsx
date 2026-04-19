@@ -27,12 +27,17 @@ export default function ActionMenu({ items, desktopInline }: ActionMenuProps) {
 
   useEffect(() => {
     if (!open) return;
-    const onClickOutside = (e: MouseEvent) => {
+    const onClickOutside = (e: MouseEvent | TouchEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', onClickOutside);
-    document.addEventListener('touchstart', onClickOutside);
+    // Defer attaching listeners so the same touch/click that opened the menu
+    // doesn't immediately close it.
+    const t = setTimeout(() => {
+      document.addEventListener('mousedown', onClickOutside);
+      document.addEventListener('touchstart', onClickOutside);
+    }, 0);
     return () => {
+      clearTimeout(t);
       document.removeEventListener('mousedown', onClickOutside);
       document.removeEventListener('touchstart', onClickOutside);
     };
@@ -43,6 +48,8 @@ export default function ActionMenu({ items, desktopInline }: ActionMenuProps) {
       <div className="relative" ref={ref}>
         <button
           onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           className="p-1.5 rounded hover:bg-secondary"
           aria-label="Mais ações"
         >
